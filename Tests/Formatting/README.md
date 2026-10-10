@@ -17,6 +17,9 @@ mixed-selection feedback, dictation color preservation, Unicode/CJK word colors
 and offsets, optional Director messages, whitespace/paragraph normalization,
 read/unread color splitting, palette persistence and limits, missed drops,
 cancelled drags, drag-away removal, and the neutral-gray ninth preset.
+Remote checks execute the generated reader HTML and cover per-word colors,
+read/current dimming, cue colors, black-to-white fallback, live text/color edits,
+legacy state fallback, and mirror controls.
 
 ## Desktop acceptance checks
 

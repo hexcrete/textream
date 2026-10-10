@@ -9,7 +9,9 @@ xcrun swiftc -swift-version 5 -default-isolation MainActor -parse-as-library \
   "$src/FormattedText.swift" "$src/TextWords.swift" "$src/DirectorMessages.swift" \
   "$src/TextDirection.swift" "$src/HighlightingTextEditor.swift" \
   "$src/NotchSettings.swift" "$src/EditorPalette.swift" "$src/LanguageDetection.swift" \
+  "$src/BrowserServer.swift" \
   "$root/Tests/Formatting/SettingsDependencies.swift" \
   "$root/Tests/Formatting/FormattingChecks.swift" -o "$work/checks"
-"$work/checks"
+"$work/checks" "$work/remote.html"
 node "$root/Tests/Formatting/director-checks.js"
+node "$root/Tests/Formatting/remote-checks.js" "$work/remote.html"

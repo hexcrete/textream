@@ -5,3 +5,11 @@ final class TextreamService {
     func updateBrowserServer() {}
     func updateDirectorServer() {}
 }
+
+final class SpeechRecognizer {
+    var recognizedCharCount = 0
+    var isListening = false
+    var isSpeaking = false
+    var lastSpokenText = ""
+    var audioLevels: [Double] = []
+}

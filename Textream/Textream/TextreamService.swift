@@ -97,6 +97,7 @@ class TextreamService: NSObject, ObservableObject {
             browserServer.showContent(
                 speechRecognizer: overlayController.speechRecognizer,
                 words: words,
+                wordColors: (page ?? FormattedPage(trimmed)).wordColors(for: words),
                 totalCharCount: totalCharCount,
                 hasNextPage: hasNextPage
             )
@@ -154,6 +155,7 @@ class TextreamService: NSObject, ObservableObject {
         if browserServer.isRunning {
             browserServer.updateContent(
                 words: words,
+                wordColors: formattedPages[index].wordColors(for: words),
                 totalCharCount: words.joined(separator: " ").count,
                 hasNextPage: hasNextPage
             )
@@ -460,6 +462,7 @@ class TextreamService: NSObject, ObservableObject {
             browserServer.showContent(
                 speechRecognizer: overlayController.speechRecognizer,
                 words: words,
+                wordColors: page.wordColors(for: words),
                 totalCharCount: totalCharCount,
                 hasNextPage: false
             )
@@ -513,6 +516,7 @@ class TextreamService: NSObject, ObservableObject {
         if browserServer.isRunning {
             browserServer.updateContent(
                 words: words,
+                wordColors: page.wordColors(for: words),
                 totalCharCount: totalCharCount,
                 hasNextPage: false
             )

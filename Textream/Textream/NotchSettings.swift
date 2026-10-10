@@ -359,7 +359,7 @@ class NotchSettings {
         didSet { UserDefaults.standard.set(fontFamilyPreset.rawValue, forKey: "fontFamilyPreset") }
     }
 
-    // Legacy Remote reader preference; desktop projection now uses page colors.
+    // Retained preference key for older versions; projection now uses page colors.
     var fontColorPreset: FontColorPreset {
         didSet { UserDefaults.standard.set(fontColorPreset.rawValue, forKey: "fontColorPreset") }
     }

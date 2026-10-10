@@ -68,6 +68,9 @@ struct FormattingChecks {
 
         try checkEditor(rich)
         checkPalette()
+        if CommandLine.arguments.count > 1 {
+            try BrowserServer.generateHTML(wsPort: 7374).write(toFile: CommandLine.arguments[1], atomically: true, encoding: .utf8)
+        }
         print("PASS: rich/legacy round trips, failed saves, color-only dirty state, dictation colors, CJK/Unicode offsets, Director commands, native editor recoloring and undo/redo, palette persistence and limits")
     }
 
