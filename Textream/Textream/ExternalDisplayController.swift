@@ -33,6 +33,7 @@ class ExternalDisplayController {
         speechRecognizer: SpeechRecognizer,
         words: [String],
         totalCharCount: Int,
+        wordColors: [String] = [],
         paragraphBreakBeforeWordIndices: Set<Int> = [],
         hasNextPage: Bool = false
     ) {
@@ -43,6 +44,7 @@ class ExternalDisplayController {
         dismiss()
 
         overlayContent.words = words
+        overlayContent.wordColors = wordColors
         overlayContent.paragraphBreakBeforeWordIndices = paragraphBreakBeforeWordIndices
         overlayContent.totalCharCount = totalCharCount
         overlayContent.hasNextPage = hasNextPage
@@ -245,10 +247,11 @@ struct ExternalDisplayView: View {
                 Spacer().frame(height: 20)
 
                 SpeechScrollView(
+                    wordColors: content.wordColors,
                     words: words,
                     highlightedCharCount: effectiveCharCount,
                     font: .systemFont(ofSize: fontSize, weight: .semibold),
-                    highlightColor: NotchSettings.shared.fontColorPreset.color,
+                    highlightColor: .white,
                     cueColor: NotchSettings.shared.cueColorPreset.color,
                     cueUnreadOpacity: NotchSettings.shared.cueBrightness.unreadOpacity,
                     cueReadOpacity: NotchSettings.shared.cueBrightness.readOpacity,

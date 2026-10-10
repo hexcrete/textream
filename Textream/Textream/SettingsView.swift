@@ -270,7 +270,7 @@ struct NotchPreviewContent: View {
                             ? Self.highlightedCount
                             : Self.previewWords.count * 5,
                         font: settings.font,
-                        highlightColor: settings.fontColorPreset.color,
+                        highlightColor: .white,
                         cueColor: settings.cueColorPreset.color,
                         cueUnreadOpacity: settings.cueBrightness.unreadOpacity,
                         cueReadOpacity: settings.cueBrightness.readOpacity,
@@ -497,6 +497,9 @@ struct SettingsView: View {
         .onDisappear {
             previewController.dismiss()
         }
+        .onChange(of: settings.editorColorPaletteHex) { _, _ in
+            TextreamService.shared.directorServer.publishPaletteState()
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
             previewController.hide()
         }
@@ -606,50 +609,13 @@ struct SettingsView: View {
 
                 Divider()
 
-                // Highlight Color
-                Text("Highlight Color")
+                Text("Editor Color Palette")
                     .font(.system(size: 13, weight: .medium))
-
-                HStack(spacing: 8) {
-                    ForEach(FontColorPreset.allCases) { preset in
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                settings.fontColorPreset = preset
-                            }
-                        } label: {
-                            VStack(spacing: 6) {
-                                Circle()
-                                    .fill(preset.color)
-                                    .frame(width: 22, height: 22)
-                                    .overlay(
-                                        Circle()
-                                            .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
-                                    )
-                                    .overlay(
-                                        settings.fontColorPreset == preset
-                                            ? Image(systemName: "checkmark")
-                                                .font(.system(size: 10, weight: .bold))
-                                                .foregroundStyle(preset == .white ? .black : .white)
-                                            : nil
-                                    )
-                                Text(preset.label)
-                                    .font(.system(size: 10, weight: .medium))
-                                    .foregroundStyle(settings.fontColorPreset == preset ? .primary : .secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(settings.fontColorPreset == preset ? preset.color.opacity(0.1) : Color.primary.opacity(0.05))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .strokeBorder(settings.fontColorPreset == preset ? preset.color.opacity(0.4) : Color.clear, lineWidth: 1.5)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
+                PaletteSettingsRow(settings: settings, entries: settings.editorPalette)
+                    .frame(height: 34)
+                Text("Click to edit. Drag between colors to reorder, or away to remove.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
 
                 // Cue Color
                 Text("Cue Color")
@@ -1517,6 +1483,7 @@ struct SettingsView: View {
         settings.fontSizePreset = .lg
         settings.fontFamilyPreset = .sans
         settings.fontColorPreset = .white
+        settings.editorPalette = NotchSettings.defaultEditorPalette.map { PaletteEntry(hex: $0) }
         settings.cueColorPreset = .white
         settings.cueBrightness = .dim
         settings.overlayMode = .pinned

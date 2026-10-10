@@ -334,6 +334,12 @@ enum ReadingPosition: String, CaseIterable, Identifiable {
 class NotchSettings {
     static let shared = NotchSettings()
 
+    static let defaultEditorPalette = ["#ffffff", "#ffd60a", "#33d64a", "#4f8cff", "#a857f7", "#ff6191", "#ff453a", "#ff9e0a", "#8e8e93"]
+    var editorPalette: [PaletteEntry] {
+        didSet { UserDefaults.standard.set(editorPalette.map(\.hex), forKey: "editorColorPaletteHex") }
+    }
+    var editorColorPaletteHex: [String] { editorPalette.map(\.hex) }
+
     var notchWidth: CGFloat {
         didSet { UserDefaults.standard.set(Double(notchWidth), forKey: "notchWidth") }
     }
@@ -353,6 +359,7 @@ class NotchSettings {
         didSet { UserDefaults.standard.set(fontFamilyPreset.rawValue, forKey: "fontFamilyPreset") }
     }
 
+    // Legacy Remote reader preference; desktop projection now uses page colors.
     var fontColorPreset: FontColorPreset {
         didSet { UserDefaults.standard.set(fontColorPreset.rawValue, forKey: "fontColorPreset") }
     }
@@ -498,6 +505,9 @@ class NotchSettings {
     static let maxHeight: CGFloat = 400
 
     init() {
+        let savedPalette = UserDefaults.standard.stringArray(forKey: "editorColorPaletteHex")
+        let colors = Array((savedPalette ?? Self.defaultEditorPalette).compactMap(TextColorRun.canonicalHex).prefix(9))
+        self.editorPalette = (colors.isEmpty ? ["#ffffff"] : colors).map { PaletteEntry(hex: $0) }
         let savedWidth = UserDefaults.standard.double(forKey: "notchWidth")
         let savedHeight = UserDefaults.standard.double(forKey: "textAreaHeight")
         self.notchWidth = savedWidth > 0 ? CGFloat(savedWidth) : Self.defaultWidth
