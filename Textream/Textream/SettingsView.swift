@@ -615,7 +615,7 @@ struct SettingsView: View {
                     .font(.system(size: 13, weight: .medium))
                 PaletteSettingsRow(settings: settings, entries: settings.editorPalette)
                     .frame(height: 34)
-                Text("Click to edit. Drag between colors to reorder, or away to remove.")
+                Text("Click to edit; right-click to delete; drag to reorder or remove.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
 
@@ -625,7 +625,7 @@ struct SettingsView: View {
 
                 PaletteSettingsRow(settings: settings, entries: settings.cuePalette, isCue: true)
                     .frame(height: 34)
-                Text("Click to select; double-click to edit. Right-click to delete; drag to reorder or remove.")
+                Text("Click to select; double-click to edit; right-click to delete; drag to reorder or remove.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
 

@@ -91,7 +91,7 @@ struct ScriptPaletteSettings: View {
         } header: {
             Text("Editor Color Palette")
         } footer: {
-            Text("Tap a color to customize it. Touch and hold for Delete. Keep 1–8 colors; quick colors are hidden when only one remains.")
+            Text("Tap a color to customize it. Touch and hold to delete. Quick colors are hidden when only one remains.")
         }
     }
 }

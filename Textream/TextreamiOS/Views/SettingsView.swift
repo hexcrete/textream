@@ -76,7 +76,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Stage directions")
                 } footer: {
-                    Text("Tap a color to select it. Touch and hold to edit or delete. Keep 1–8 colors.")
+                    Text("Tap a color to select it. Touch and hold to edit or delete.")
                 }
 
                 Section("Camera overlay") {
