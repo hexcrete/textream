@@ -334,7 +334,7 @@ enum ReadingPosition: String, CaseIterable, Identifiable {
 class NotchSettings {
     static let shared = NotchSettings()
 
-    static let defaultEditorPalette = ["#ffffff", "#ffd60a", "#33d64a", "#4f8cff", "#a857f7", "#ff6191", "#ff453a", "#ff9e0a", "#8e8e93"]
+    static let defaultEditorPalette = TextColorRun.defaultPalette
     var editorPalette: [PaletteEntry] {
         didSet { UserDefaults.standard.set(editorPalette.map(\.hex), forKey: "editorColorPaletteHex") }
     }

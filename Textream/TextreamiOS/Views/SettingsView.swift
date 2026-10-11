@@ -64,9 +64,7 @@ struct SettingsView: View {
                     .pickerStyle(.segmented)
                 }
 
-                Section("Text color") {
-                    ColorPresetPicker(selection: $model.textColor)
-                }
+                ScriptPaletteSettings(model: model)
 
                 Section("Stage directions") {
                     ColorPresetPicker(selection: $model.cueColor)

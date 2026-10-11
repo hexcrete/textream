@@ -1,6 +1,13 @@
+#if canImport(AppKit)
 import AppKit
+typealias FormattingColor = NSColor
+#else
+import UIKit
+typealias FormattingColor = UIColor
+#endif
 
 struct TextColorRun: Codable, Equatable {
+    static let defaultPalette = ["#ffffff", "#ffd60a", "#33d64a", "#4f8cff", "#a857f7", "#ff6191", "#ff453a", "#ff9e0a", "#8e8e93"]
     var text: String
     var color: String
 
@@ -17,20 +24,49 @@ struct TextColorRun: Codable, Equatable {
     }
 }
 
-extension NSColor {
+extension FormattingColor {
     convenience init(rgbHex: String) {
         let value = UInt32((TextColorRun.canonicalHex(rgbHex) ?? "#ffffff").dropFirst(), radix: 16)!
+        #if canImport(AppKit)
         self.init(srgbRed: CGFloat((value >> 16) & 255) / 255,
                   green: CGFloat((value >> 8) & 255) / 255,
                   blue: CGFloat(value & 255) / 255, alpha: 1)
+        #else
+        self.init(red: CGFloat((value >> 16) & 255) / 255,
+                  green: CGFloat((value >> 8) & 255) / 255,
+                  blue: CGFloat(value & 255) / 255, alpha: 1)
+        #endif
     }
 
     var rgbHex: String {
+        #if canImport(AppKit)
         guard let rgb = usingColorSpace(.sRGB) else { return "#ffffff" }
+        let red = rgb.redComponent, green = rgb.greenComponent, blue = rgb.blueComponent
+        #else
+        if self === Self.defaultBlackText { return "#000000" }
+        if self === Self.defaultWhiteText || self == .label { return "#ffffff" }
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        guard getRed(&red, green: &green, blue: &blue, alpha: &alpha) else { return "#ffffff" }
+        #endif
         func channel(_ value: CGFloat) -> Int { Int((min(1, max(0, value)) * 255).rounded()) }
-        return String(format: "#%02x%02x%02x", channel(rgb.redComponent), channel(rgb.greenComponent), channel(rgb.blueComponent))
+        return String(format: "#%02x%02x%02x", channel(red), channel(green), channel(blue))
     }
 }
+
+#if canImport(UIKit)
+extension UIColor {
+    // Keep canonical colors identifiable while rendering defaults for the current appearance.
+    static let defaultBlackText = UIColor { $0.userInterfaceStyle == .dark ? .white : .black }
+    static let defaultWhiteText = UIColor { $0.userInterfaceStyle == .dark ? .white : .black }
+    var editorTextColor: UIColor {
+        switch rgbHex {
+        case "#000000": Self.defaultBlackText
+        case "#ffffff": Self.defaultWhiteText
+        default: self
+        }
+    }
+}
+#endif
 
 struct FormattedPage: Codable, Equatable {
     private(set) var runs: [TextColorRun]
@@ -54,7 +90,7 @@ struct FormattedPage: Codable, Equatable {
         var runs: [TextColorRun] = []
         attributedString.enumerateAttribute(.foregroundColor, in: NSRange(location: 0, length: attributedString.length)) { value, range, _ in
             runs.append(TextColorRun(text: (attributedString.string as NSString).substring(with: range),
-                                     color: (value as? NSColor)?.rgbHex ?? "#ffffff"))
+                                     color: (value as? FormattingColor)?.rgbHex ?? "#ffffff"))
         }
         self.init(runs: runs)
     }
@@ -62,10 +98,20 @@ struct FormattedPage: Codable, Equatable {
     var attributedString: NSAttributedString {
         let result = NSMutableAttributedString(string: "")
         for run in runs {
-            result.append(NSAttributedString(string: run.text, attributes: [.foregroundColor: NSColor(rgbHex: run.color)]))
+            result.append(NSAttributedString(string: run.text, attributes: [.foregroundColor: FormattingColor(rgbHex: run.color)]))
         }
         return result
     }
+
+    #if canImport(UIKit)
+    var editorAttributedString: NSAttributedString {
+        let result = NSMutableAttributedString(attributedString: attributedString)
+        result.enumerateAttribute(.foregroundColor, in: NSRange(location: 0, length: result.length)) { value, range, _ in
+            if let color = value as? UIColor { result.addAttribute(.foregroundColor, value: color.editorTextColor, range: range) }
+        }
+        return result
+    }
+    #endif
 
     /// Dictation replaces a changing segment while preserving the colors outside it.
     func updatingText(_ newText: String, insertionColor: String? = nil) -> FormattedPage {
@@ -78,8 +124,8 @@ struct FormattedPage: Codable, Equatable {
         let start = String(old.prefix(prefix)).utf16.count
         let length = String(old.dropFirst(prefix).dropLast(suffix)).utf16.count
         let storage = NSMutableAttributedString(attributedString: attributedString)
-        let inherited = start > 0 ? storage.attribute(.foregroundColor, at: start - 1, effectiveRange: nil) as? NSColor : nil
-        let color = insertionColor.map { NSColor(rgbHex: $0) } ?? inherited ?? .white
+        let inherited = start > 0 ? storage.attribute(.foregroundColor, at: start - 1, effectiveRange: nil) as? FormattingColor : nil
+        let color = insertionColor.map { FormattingColor(rgbHex: $0) } ?? inherited ?? .white
         let replacement = String(new.dropFirst(prefix).dropLast(suffix))
         storage.replaceCharacters(in: NSRange(location: start, length: length),
                                   with: NSAttributedString(string: replacement, attributes: [.foregroundColor: color]))
@@ -95,7 +141,7 @@ struct FormattedPage: Codable, Equatable {
             let range = source.range(of: word, options: [], range: NSRange(location: offset, length: source.length - offset))
             guard range.location != NSNotFound else { return "#ffffff" }
             offset = NSMaxRange(range)
-            let color = (storage.attribute(.foregroundColor, at: range.location, effectiveRange: nil) as? NSColor)?.rgbHex ?? "#ffffff"
+            let color = (storage.attribute(.foregroundColor, at: range.location, effectiveRange: nil) as? FormattingColor)?.rgbHex ?? "#ffffff"
             return color == "#000000" ? "#ffffff" : color
         }
     }

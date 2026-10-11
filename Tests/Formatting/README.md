@@ -65,3 +65,29 @@ cannot open the new format. Tests never overwrite an existing document.
 The automated checks do not certify microphone recognition, physical external
 displays, native drag gestures, or toolbar appearance. Those require the actual
 app and the manual checks above.
+
+## iOS formatting
+
+The iOS and macOS targets share `Textream/Shared/FormattedText.swift`. The iOS
+script and ordered palette persist locally using UserDefaults; old plain scripts
+load as white text. Settings uses native color pickers. Touch and hold a palette
+entry to delete it, or use plus to add one (1–8 entries; plus is hidden at eight). The expanded editor
+provides a horizontally scrollable color bar above the keyboard, hidden at one
+entry. Cue fonts/backgrounds remain presentation-only; cue color settings still
+control stage directions in projection.
+
+Build the app and compile tests without launching Simulator:
+
+```sh
+xcodebuild -project Textream/Textream.xcodeproj -scheme TextreamiOS \
+  -configuration Debug -sdk iphonesimulator \
+  -destination 'generic/platform=iOS Simulator' \
+  -derivedDataPath Textream/build-ios CODE_SIGNING_ALLOWED=NO build-for-testing
+```
+
+Run the TextreamiOS scheme's tests in Xcode after choosing an installed Simulator.
+`FormattingTests` covers rich persistence, legacy migration, palette limits,
+stable picker identities, default light/dark colors, Unicode/CJK projection,
+selection recoloring, typing colors, undo/redo, and mixed-selection feedback.
+Before accepting the UI, test colored paste, picker interaction/persistence,
+keyboard bar layout on iPhone/iPad, and colors in Read and Record modes.

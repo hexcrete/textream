@@ -6,7 +6,7 @@ trap 'rm -rf "$work"' EXIT
 src="$root/Textream/Textream"
 xcrun swiftc -swift-version 5 -default-isolation MainActor -parse-as-library \
   -module-cache-path "$work/cache" \
-  "$src/FormattedText.swift" "$src/TextWords.swift" "$src/DirectorMessages.swift" \
+  "$root/Textream/Shared/FormattedText.swift" "$src/TextWords.swift" "$src/DirectorMessages.swift" \
   "$src/TextDirection.swift" "$src/HighlightingTextEditor.swift" \
   "$src/NotchSettings.swift" "$src/EditorPalette.swift" "$src/LanguageDetection.swift" \
   "$src/BrowserServer.swift" \
