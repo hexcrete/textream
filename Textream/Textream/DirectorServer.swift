@@ -263,7 +263,7 @@ class DirectorServer {
             isDone: isDone,
             isListening: speechRecognizer?.isListening ?? false,
             fontColor: "#ffffff",
-            cueColor: NotchSettings.shared.cueColorPreset.cssColor,
+            cueColor: NotchSettings.shared.cueColorHex,
             lastSpokenText: speechRecognizer?.lastSpokenText ?? "",
             audioLevels: (speechRecognizer?.audioLevels ?? []).map { Double($0) }
         )

@@ -24,6 +24,13 @@ class EditorFormattingController {
 }
 
 final class FormattingTextView: NSTextView {
+    override func becomeFirstResponder() -> Bool {
+        // NSTextView synchronizes the shared color panel when focus returns.
+        // Release the palette target before that can overwrite its saved color.
+        PaletteRow.closeActivePicker()
+        return super.becomeFirstResponder()
+    }
+
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         refreshDefaultTextColor()

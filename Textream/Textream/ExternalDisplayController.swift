@@ -252,7 +252,7 @@ struct ExternalDisplayView: View {
                     highlightedCharCount: effectiveCharCount,
                     font: .systemFont(ofSize: fontSize, weight: .semibold),
                     highlightColor: .white,
-                    cueColor: NotchSettings.shared.cueColorPreset.color,
+                    cueColor: NotchSettings.shared.cueColor,
                     cueUnreadOpacity: NotchSettings.shared.cueBrightness.unreadOpacity,
                     cueReadOpacity: NotchSettings.shared.cueBrightness.readOpacity,
                     onWordTap: { charOffset in

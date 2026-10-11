@@ -42,14 +42,17 @@ struct PaletteSettingsRow: NSViewRepresentable {
     let settings: NotchSettings
     let entries: [PaletteEntry]
 
+    var isCue = false
+
     func makeNSView(context: Context) -> PaletteRow {
-        let row = PaletteRow(settings: settings)
+        let row = PaletteRow(settings: settings, isCue: isCue)
         row.refresh()
         return row
     }
 
     func updateNSView(_ row: PaletteRow, context: Context) {
-        _ = settings.editorColorPaletteHex
+        _ = entries.map(\.hex)
+        _ = settings.cueColorHex
         row.refresh()
     }
 
@@ -58,15 +61,26 @@ struct PaletteSettingsRow: NSViewRepresentable {
 
 class PaletteRow: NSView {
     static let pasteboardType = NSPasteboard.PasteboardType("dev.fka.textream.palette-entry")
+    private static weak var pickerOwner: PaletteRow?
     let settings: NotchSettings
+    let isCue: Bool
+    var entries: [PaletteEntry] {
+        get { isCue ? settings.cuePalette : settings.editorPalette }
+        set {
+            if isCue { settings.cuePalette = newValue }
+            else { settings.editorPalette = newValue }
+        }
+    }
     private var buttons: [UUID: PaletteSwatch] = [:]
     private var editingID: UUID?
+    private var panelCloseObserver: NSObjectProtocol?
     private var insertionIndex: Int?
     private let addButton = NSButton()
     private let step: CGFloat = 34
 
-    init(settings: NotchSettings) {
+    init(settings: NotchSettings, isCue: Bool) {
         self.settings = settings
+        self.isCue = isCue
         super.init(frame: .zero)
         registerForDraggedTypes([Self.pasteboardType])
         addButton.image = NSImage(systemSymbolName: "plus", accessibilityDescription: "Add color")
@@ -79,49 +93,73 @@ class PaletteRow: NSView {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    override var intrinsicContentSize: NSSize { NSSize(width: step * CGFloat(settings.editorPalette.count + 1), height: 34) }
+    override var intrinsicContentSize: NSSize {
+        let addSlots = entries.count < NotchSettings.maximumPaletteColors ? 1 : 0
+        return NSSize(width: step * CGFloat(entries.count + addSlots), height: 34)
+    }
 
     func refresh() {
-        let ids = Set(settings.editorPalette.map(\.id))
+        let ids = Set(entries.map(\.id))
         for id in Array(buttons.keys) where !ids.contains(id) {
             buttons.removeValue(forKey: id)?.removeFromSuperview()
             if editingID == id { closePicker() }
         }
-        for (index, entry) in settings.editorPalette.enumerated() {
+        for (index, entry) in entries.enumerated() {
             let button = buttons[entry.id] ?? PaletteSwatch(entryID: entry.id, row: self)
             if buttons[entry.id] == nil { buttons[entry.id] = button; addSubview(button) }
-            button.frame = NSRect(x: CGFloat(index) * step, y: 2, width: 30, height: 30)
-            button.image = NSImage(size: NSSize(width: 26, height: 26), flipped: false) { rect in
+            button.frame = NSRect(x: CGFloat(index) * step, y: isCue ? 0 : 2,
+                                  width: isCue ? 34 : 30, height: isCue ? 34 : 30)
+            let selected = isCue && settings.selectedCueID == entry.id
+            let imageSize: CGFloat = isCue ? 34 : 26
+            let swatchInset: CGFloat = isCue ? 5 : 1
+            button.imageScaling = .scaleNone
+            button.image = NSImage(size: NSSize(width: imageSize, height: imageSize), flipped: false) { rect in
+                let swatch = NSBezierPath(roundedRect: rect.insetBy(dx: swatchInset, dy: swatchInset), xRadius: 7, yRadius: 7)
                 NSColor(rgbHex: entry.hex).setFill()
-                NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: 7, yRadius: 7).fill()
+                swatch.fill()
                 NSColor.separatorColor.setStroke()
-                NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: 7, yRadius: 7).stroke()
+                swatch.stroke()
+                if selected {
+                    NSColor.controlAccentColor.setStroke()
+                    let ring = NSBezierPath(roundedRect: rect.insetBy(dx: 1.5, dy: 1.5), xRadius: 11, yRadius: 11)
+                    ring.lineWidth = 3
+                    ring.stroke()
+                }
                 return true
             }
-            button.setAccessibilityLabel("Edit palette color \(entry.hex)")
+            button.setAccessibilityLabel("\(isCue ? "Select cue" : "Edit palette") color \(entry.hex)")
+            button.setAccessibilityValue(selected ? "Selected" : "Not selected")
         }
-        addButton.frame = NSRect(x: CGFloat(settings.editorPalette.count) * step, y: 2, width: 30, height: 30)
-        addButton.isEnabled = settings.editorPalette.count < 9
+        addButton.frame = NSRect(x: CGFloat(entries.count) * step, y: 2, width: 30, height: 30)
+        addButton.isEnabled = entries.count < NotchSettings.maximumPaletteColors
+        addButton.isHidden = !addButton.isEnabled
         invalidateIntrinsicContentSize()
     }
 
     @objc private func addColor() {
-        guard settings.editorPalette.count < 9 else { return }
-        let preset = NotchSettings.defaultEditorPalette.first { !settings.editorColorPaletteHex.contains($0) } ?? "#8e8e93"
-        settings.editorPalette.append(PaletteEntry(hex: preset))
+        guard entries.count < NotchSettings.maximumPaletteColors else { return }
+        let preset = NotchSettings.defaultEditorPalette.first { !entries.map(\.hex).contains($0) } ?? "#8e8e93"
+        entries.append(PaletteEntry(hex: preset))
     }
 
     func openPicker(for id: UUID) {
-        guard let entry = settings.editorPalette.first(where: { $0.id == id }) else { return }
+        guard let entry = entries.first(where: { $0.id == id }) else { return }
         let panel = NSColorPanel.shared
+        Self.pickerOwner?.closePicker(closePanel: false)
         panel.setTarget(nil)
         panel.setAction(nil)
         editingID = id
+        Self.pickerOwner = self
         panel.showsAlpha = false
         panel.isContinuous = true
         panel.color = NSColor(rgbHex: entry.hex)
         panel.setTarget(self)
         panel.setAction(#selector(colorChanged(_:)))
+        panelCloseObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification, object: panel, queue: .main
+        ) { [weak self] _ in
+            self?.closePicker(closePanel: false)
+        }
         if let window {
             panel.setFrameOrigin(NSPoint(x: window.frame.midX - panel.frame.width / 2,
                                          y: window.frame.midY - panel.frame.height / 2))
@@ -130,18 +168,39 @@ class PaletteRow: NSView {
     }
 
     @objc private func colorChanged(_ panel: NSColorPanel) {
-        guard let id = editingID, let index = settings.editorPalette.firstIndex(where: { $0.id == id }) else { return }
-        let hex = panel.color.rgbHex
-        if settings.editorPalette[index].hex != hex { settings.editorPalette[index].hex = hex }
+        guard Self.pickerOwner === self, let id = editingID,
+              let index = entries.firstIndex(where: { $0.id == id }) else { return }
+        // Pattern colors cannot be represented by our RGB-only palette.
+        // Retain the last valid color instead of silently replacing it with white.
+        guard let rgb = panel.color.usingColorSpace(.sRGB) else { return }
+        let hex = rgb.rgbHex
+        if entries[index].hex != hex { entries[index].hex = hex }
     }
 
-    func closePicker() {
+    static func closeActivePicker() {
+        pickerOwner?.closePicker()
+    }
+
+    func closePicker(closePanel: Bool = true) {
         guard editingID != nil else { return }
         editingID = nil
+        if let panelCloseObserver {
+            NotificationCenter.default.removeObserver(panelCloseObserver)
+            self.panelCloseObserver = nil
+        }
         let panel = NSColorPanel.shared
-        panel.setTarget(nil)
-        panel.setAction(nil)
-        panel.close()
+        if Self.pickerOwner === self {
+            Self.pickerOwner = nil
+            panel.setTarget(nil)
+            panel.setAction(nil)
+            if closePanel { panel.close() }
+        }
+    }
+
+    func removeColor(id: UUID) {
+        guard entries.count > 1 else { return }
+        if editingID == id { closePicker() }
+        entries.removeAll { $0.id == id }
     }
 
     private func draggedID(_ info: NSDraggingInfo) -> UUID? {
@@ -153,7 +212,7 @@ class PaletteRow: NSView {
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
         guard let id = draggedID(sender), buttons[id] != nil else { return [] }
         let point = convert(sender.draggingLocation, from: nil)
-        insertionIndex = min(settings.editorPalette.count, max(0, Int((point.x + 2) / step)))
+        insertionIndex = min(entries.count, max(0, Int((point.x + 2) / step)))
         needsDisplay = true
         return .move
     }
@@ -161,12 +220,12 @@ class PaletteRow: NSView {
     override func draggingExited(_ sender: NSDraggingInfo?) { insertionIndex = nil; needsDisplay = true }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        guard let id = draggedID(sender), let source = settings.editorPalette.firstIndex(where: { $0.id == id }) else { return false }
+        guard let id = draggedID(sender), let source = entries.firstIndex(where: { $0.id == id }) else { return false }
         let target = insertionIndex ?? source
-        var entries = settings.editorPalette
-        let entry = entries.remove(at: source)
-        entries.insert(entry, at: min(entries.count, max(0, target - (source < target ? 1 : 0))))
-        settings.editorPalette = entries
+        var reordered = entries
+        let entry = reordered.remove(at: source)
+        reordered.insert(entry, at: min(reordered.count, max(0, target - (source < target ? 1 : 0))))
+        entries = reordered
         insertionIndex = nil
         needsDisplay = true
         return true
@@ -183,11 +242,11 @@ class PaletteRow: NSView {
     func dragEnded(id: UUID, point: NSPoint, operation: NSDragOperation, cancelled: Bool) {
         insertionIndex = nil
         needsDisplay = true
-        guard !cancelled, operation.isEmpty, settings.editorPalette.count > 1, let window else { return }
+        guard !cancelled, operation.isEmpty, entries.count > 1, let window else { return }
         let local = convert(window.convertPoint(fromScreen: point), from: nil)
         // A missed insertion within the row must never delete a color.
         guard !bounds.insetBy(dx: -10, dy: -12).contains(local) else { return }
-        settings.editorPalette.removeAll { $0.id == id }
+        removeColor(id: id)
     }
 }
 
@@ -204,16 +263,41 @@ class PaletteSwatch: NSButton, NSDraggingSource {
         isBordered = false
         imagePosition = .imageOnly
         target = self
-        action = #selector(editColor)
+        action = #selector(selectOrEdit)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     @objc private func editColor() { row?.openPicker(for: entryID) }
+    @objc private func selectOrEdit() {
+        guard let row else { return }
+        if row.isCue, let entry = row.entries.first(where: { $0.id == entryID }) {
+            row.settings.selectedCueID = entry.id
+        } else { editColor() }
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        let edit = NSMenuItem(title: "Edit Color", action: #selector(editColor), keyEquivalent: "")
+        edit.target = self
+        menu.addItem(edit)
+        let item = NSMenuItem(title: "Delete", action: #selector(deleteColor), keyEquivalent: "")
+        item.target = self
+        item.isEnabled = (row?.entries.count ?? 0) > 1
+        menu.addItem(item)
+        return menu
+    }
+
+    @objc private func deleteColor() { row?.removeColor(id: entryID) }
 
     override func mouseDown(with event: NSEvent) {
         guard let window else { return }
         while let next = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) {
-            if next.type == .leftMouseUp { editColor(); return }
+            if next.type == .leftMouseUp {
+                if row?.isCue == true && event.clickCount == 2 { editColor() }
+                else { selectOrEdit() }
+                return
+            }
             guard hypot(next.locationInWindow.x - event.locationInWindow.x,
                         next.locationInWindow.y - event.locationInWindow.y) > 4 else { continue }
             let item = NSPasteboardItem()

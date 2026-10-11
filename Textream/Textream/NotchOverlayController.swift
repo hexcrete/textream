@@ -929,7 +929,7 @@ struct NotchOverlayView: View {
                 highlightedCharCount: effectiveCharCount,
                 font: NotchSettings.shared.font,
                 highlightColor: .white,
-                cueColor: NotchSettings.shared.cueColorPreset.color,
+                cueColor: NotchSettings.shared.cueColor,
                 cueUnreadOpacity: NotchSettings.shared.cueBrightness.unreadOpacity,
                 cueReadOpacity: NotchSettings.shared.cueBrightness.readOpacity,
                 onWordTap: { charOffset in
@@ -1451,7 +1451,7 @@ struct FloatingOverlayView: View {
                 highlightedCharCount: effectiveCharCount,
                 font: NotchSettings.shared.font,
                 highlightColor: .white,
-                cueColor: NotchSettings.shared.cueColorPreset.color,
+                cueColor: NotchSettings.shared.cueColor,
                 cueUnreadOpacity: NotchSettings.shared.cueBrightness.unreadOpacity,
                 cueReadOpacity: NotchSettings.shared.cueBrightness.readOpacity,
                 onWordTap: { charOffset in

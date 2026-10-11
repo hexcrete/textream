@@ -225,7 +225,7 @@ class BrowserServer {
             isListening: speechRecognizer?.isListening ?? false,
             isDone: isDone,
             fontColor: "#ffffff",
-            cueColor: NotchSettings.shared.cueColorPreset.cssColor,
+            cueColor: NotchSettings.shared.cueColorHex,
             hasNextPage: hasNextPage,
             isActive: true,
             highlightWords: highlightWords,
