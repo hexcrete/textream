@@ -285,7 +285,7 @@ struct PromptSessionConfiguration: Equatable {
     let scrollSpeed: Double
     let fontFamily: PromptFontFamily
     let fontSize: PromptFontSize
-    let cueColor: PromptColorPreset
+    let cueColorHex: String
     let cueBrightness: CueBrightness
     let overlayOpacity: Double
     let speechLocaleIdentifier: String

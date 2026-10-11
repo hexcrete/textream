@@ -70,12 +70,13 @@ struct ScriptPaletteSettings: View {
         Section {
             HStack(spacing: 0) {
                 ForEach(model.editorPalette) { entry in
-                    PaletteColorWell(
+                    PaletteColorSwatch(
                         hex: entry.hex,
                         canDelete: model.editorPalette.count > 1,
                         onChange: { model.setPaletteColor($0, id: entry.id) },
                         onDelete: { model.removePaletteColor(id: entry.id) }
                     )
+                    .frame(width: 44, height: 44)
                     .frame(width: 32, height: 32)
                     .frame(maxWidth: .infinity)
                 }
@@ -95,49 +96,110 @@ struct ScriptPaletteSettings: View {
     }
 }
 
-private struct PaletteColorWell: UIViewRepresentable {
+private struct PaletteColorSwatch: UIViewRepresentable {
     let hex: String
+    var title = "Palette Color"
+    var selected = false
     let canDelete: Bool
+    var onSelect: (() -> Void)? = nil
     let onChange: (String) -> Void
     let onDelete: () -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
 
-    func makeUIView(context: Context) -> UIColorWell {
-        let well = UIColorWell()
-        well.title = "Palette Color"
-        well.supportsAlpha = false
-        well.selectedColor = UIColor(rgbHex: hex)
-        well.addTarget(context.coordinator, action: #selector(Coordinator.colorChanged(_:)), for: .valueChanged)
-        // Own the context menu at the native control level so Form cannot
-        // promote a swatch's menu to the entire palette row.
-        well.addInteraction(UIContextMenuInteraction(delegate: context.coordinator))
-        well.accessibilityLabel = "Palette color \(hex)"
-        return well
+    func makeUIView(context: Context) -> PaletteSwatchButton {
+        let button = PaletteSwatchButton(frame: .zero)
+        button.addTarget(context.coordinator, action: #selector(Coordinator.activate), for: .touchUpInside)
+        // Keep the menu attached to each native swatch, not the enclosing Form row.
+        button.addInteraction(UIContextMenuInteraction(delegate: context.coordinator))
+        context.coordinator.button = button
+        return button
     }
 
-    func updateUIView(_ well: UIColorWell, context: Context) {
+    func updateUIView(_ button: PaletteSwatchButton, context: Context) {
         context.coordinator.parent = self
-        if well.selectedColor?.rgbHex != hex {
-            well.selectedColor = UIColor(rgbHex: hex)
-        }
-        well.accessibilityLabel = "Palette color \(hex)"
+        button.swatchColor = UIColor(rgbHex: hex)
+        button.showsSelection = selected
+        button.setNeedsLayout()
+        button.accessibilityLabel = "\(title) \(hex)"
+        button.accessibilityTraits = selected ? [.button, .selected] : [.button]
     }
 
-    final class Coordinator: NSObject, UIContextMenuInteractionDelegate {
-        var parent: PaletteColorWell
-        init(parent: PaletteColorWell) { self.parent = parent }
+    static func dismantleUIView(_ button: PaletteSwatchButton, coordinator: Coordinator) {
+        coordinator.closePicker()
+    }
 
-        @objc func colorChanged(_ well: UIColorWell) {
-            if let color = well.selectedColor { parent.onChange(color.rgbHex) }
+    final class Coordinator: NSObject, UIContextMenuInteractionDelegate, UIColorPickerViewControllerDelegate, UIAdaptivePresentationControllerDelegate {
+        var parent: PaletteColorSwatch
+        weak var button: UIButton?
+        private weak var picker: UIColorPickerViewController?
+
+        init(parent: PaletteColorSwatch) { self.parent = parent }
+
+        @objc func activate() {
+            if let select = parent.onSelect { select() }
+            else { openPicker() }
+        }
+
+        private func openPicker() {
+            guard picker == nil, let button, button.window != nil else { return }
+            var responder: UIResponder? = button
+            while let current = responder, !(current is UIViewController) { responder = current.next }
+            guard let presenter = responder as? UIViewController, presenter.presentedViewController == nil else { return }
+
+            let picker = UIColorPickerViewController()
+            picker.title = parent.title
+            picker.supportsAlpha = false
+            picker.selectedColor = UIColor(rgbHex: parent.hex)
+            picker.delegate = self
+            picker.modalPresentationStyle = .popover
+            if let popover = picker.popoverPresentationController {
+                popover.sourceView = button
+                popover.sourceRect = button.bounds
+                popover.permittedArrowDirections = [.up, .down]
+                popover.adaptiveSheetPresentationController.detents = [.medium(), .large()]
+            }
+            picker.presentationController?.delegate = self
+            self.picker = picker
+            presenter.present(picker, animated: true)
+        }
+
+        func closePicker() {
+            guard let picker else { return }
+            self.picker = nil
+            picker.delegate = nil
+            picker.presentationController?.delegate = nil
+            picker.dismiss(animated: false)
+        }
+
+        func colorPickerViewController(_ viewController: UIColorPickerViewController, didSelect color: UIColor, continuously: Bool) {
+            guard picker === viewController else { return }
+            var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+            guard color.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else { return }
+            parent.onChange(color.rgbHex)
+        }
+
+        func colorPickerViewControllerDidFinish(_ viewController: UIColorPickerViewController) {
+            guard picker === viewController else { return }
+            picker = nil
+            viewController.delegate = nil
+            viewController.presentationController?.delegate = nil
+        }
+
+        func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+            guard let picker, presentationController.presentedViewController === picker else { return }
+            self.picker = nil
+            picker.delegate = nil
+            presentationController.delegate = nil
         }
 
         private func preview(for interaction: UIContextMenuInteraction) -> UITargetedPreview? {
-            guard let well = interaction.view else { return nil }
+            guard let view = interaction.view as? PaletteSwatchButton else { return nil }
             let parameters = UIPreviewParameters()
             parameters.backgroundColor = .clear
-            parameters.visiblePath = UIBezierPath(ovalIn: well.bounds)
-            return UITargetedPreview(view: well, parameters: parameters)
+            let inset: CGFloat = view.showsSelection ? 0 : 6
+            parameters.visiblePath = UIBezierPath(ovalIn: view.bounds.insetBy(dx: inset, dy: inset))
+            return UITargetedPreview(view: view, parameters: parameters)
         }
 
         func contextMenuInteraction(_ interaction: UIContextMenuInteraction, previewForHighlightingMenuWithConfiguration configuration: UIContextMenuConfiguration) -> UITargetedPreview? {
@@ -151,12 +213,78 @@ private struct PaletteColorWell: UIViewRepresentable {
         func contextMenuInteraction(_ interaction: UIContextMenuInteraction, configurationForMenuAtLocation location: CGPoint) -> UIContextMenuConfiguration? {
             UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] _ in
                 guard let self else { return nil }
+                let edit = UIAction(title: "Edit Color", image: UIImage(systemName: "paintpalette")) { [weak self] _ in
+                    self?.openPicker()
+                }
                 let delete = UIAction(title: "Delete", image: UIImage(systemName: "trash"), attributes: parent.canDelete ? [.destructive] : [.destructive, .disabled]) { [weak self] _ in
                     guard let self, parent.canDelete else { return }
                     parent.onDelete()
                 }
-                return UIMenu(children: [delete])
+                return UIMenu(children: [edit, delete])
             }
         }
+    }
+}
+
+private final class PaletteSwatchButton: UIButton {
+    var swatchColor: UIColor = .white
+    var showsSelection = false
+    private let dotLayer = CAShapeLayer()
+    private let selectionLayer = CAShapeLayer()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        layer.addSublayer(dotLayer)
+        layer.addSublayer(selectionLayer)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        dotLayer.frame = bounds
+        dotLayer.path = UIBezierPath(ovalIn: bounds.insetBy(dx: 6.5, dy: 6.5)).cgPath
+        dotLayer.fillColor = swatchColor.cgColor
+        dotLayer.strokeColor = UIColor.separator.cgColor
+        dotLayer.lineWidth = 1
+        selectionLayer.frame = bounds
+        selectionLayer.path = UIBezierPath(ovalIn: bounds.insetBy(dx: 1.5, dy: 1.5)).cgPath
+        selectionLayer.fillColor = UIColor.clear.cgColor
+        selectionLayer.strokeColor = tintColor.cgColor
+        selectionLayer.lineWidth = 3
+        selectionLayer.isHidden = !showsSelection
+        CATransaction.commit()
+    }
+}
+
+struct CuePaletteSettings: View {
+    @Bindable var model: AppModel
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(model.cuePalette) { entry in
+                PaletteColorSwatch(
+                    hex: entry.hex,
+                    title: "Cue Color",
+                    selected: model.selectedCueID == entry.id,
+                    canDelete: model.cuePalette.count > 1,
+                    onSelect: { model.selectedCueID = entry.id },
+                    onChange: { model.setCuePaletteColor($0, id: entry.id) },
+                    onDelete: { model.removeCuePaletteColor(id: entry.id) }
+                )
+                .frame(width: 44, height: 44)
+                .frame(width: 32, height: 32)
+                .frame(maxWidth: .infinity)
+            }
+            if model.cuePalette.count < AppModel.maximumPaletteColors {
+                Button { model.addCuePaletteColor() } label: { Image(systemName: "plus") }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, minHeight: 32)
+                    .accessibilityLabel("Add cue color")
+            }
+        }
+        .padding(.vertical, 4)
     }
 }

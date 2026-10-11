@@ -58,7 +58,7 @@ struct PromptSessionView: View {
                         weight: .semibold
                     ),
                     textColor: .white,
-                    cueColor: controller.configuration.cueColor.uiColor,
+                    cueColor: UIColor(rgbHex: controller.configuration.cueColorHex),
                     cueUnreadOpacity: controller.configuration.cueBrightness.unreadOpacity,
                     cueReadOpacity: controller.configuration.cueBrightness.readOpacity,
                     wordTracking: controller.configuration.followMode == .wordTracking,

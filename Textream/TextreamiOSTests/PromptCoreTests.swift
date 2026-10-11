@@ -1970,7 +1970,7 @@ struct PromptCoreTests {
             scrollSpeed: 3,
             fontFamily: .sans,
             fontSize: fontSize,
-            cueColor: .white,
+            cueColorHex: "#ffffff",
             cueBrightness: .dim,
             overlayOpacity: 0.52,
             speechLocaleIdentifier: "en-US"

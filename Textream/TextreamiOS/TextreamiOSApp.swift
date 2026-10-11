@@ -150,7 +150,7 @@ struct TextreamiOSApp: App {
             scrollSpeed: 0.5,
             fontFamily: .sans,
             fontSize: .lg,
-            cueColor: .blue,
+            cueColorHex: "#4f8cff",
             cueBrightness: .medium,
             overlayOpacity: 0.52,
             speechLocaleIdentifier: "en-US"

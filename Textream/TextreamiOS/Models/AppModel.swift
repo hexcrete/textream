@@ -52,7 +52,25 @@ final class AppModel {
     var scrollSpeed: Double { didSet { defaults.set(scrollSpeed, forKey: Key.scrollSpeed) } }
     var fontFamily: PromptFontFamily { didSet { defaults.set(fontFamily.rawValue, forKey: Key.fontFamily) } }
     var fontSize: PromptFontSize { didSet { defaults.set(fontSize.rawValue, forKey: Key.fontSize) } }
-    var cueColor: PromptColorPreset { didSet { defaults.set(cueColor.rawValue, forKey: Key.cueColor) } }
+    private(set) var cuePalette: [ScriptPaletteEntry] {
+        didSet {
+            if !cuePalette.contains(where: { $0.id == selectedCueID }), !cuePalette.isEmpty {
+                let previousIndex = oldValue.firstIndex(where: { $0.id == selectedCueID }) ?? 0
+                selectedCueID = cuePalette[min(previousIndex, cuePalette.count - 1)].id
+            }
+            defaults.set(cuePalette.map(\.hex), forKey: "cueColorPaletteHex")
+            persistCueSelection()
+        }
+    }
+    var selectedCueID: UUID { didSet { persistCueSelection() } }
+    var cueColorHex: String { cuePalette.first(where: { $0.id == selectedCueID })?.hex ?? "#ffffff" }
+
+    private func persistCueSelection() {
+        guard let index = cuePalette.firstIndex(where: { $0.id == selectedCueID }) else { return }
+        defaults.set(index, forKey: "selectedCuePaletteIndex")
+        defaults.set(cuePalette[index].hex, forKey: "ios.cueColorHex")
+    }
+
     var cueBrightness: CueBrightness { didSet { defaults.set(cueBrightness.rawValue, forKey: Key.cueBrightness) } }
     var overlayOpacity: Double { didSet { defaults.set(overlayOpacity, forKey: Key.overlayOpacity) } }
     var speechLocaleIdentifier: String { didSet { defaults.set(speechLocaleIdentifier, forKey: Key.speechLocale) } }
@@ -86,7 +104,24 @@ final class AppModel {
         scrollSpeed = savedSpeed > 0 ? savedSpeed : 3
         fontFamily = PromptFontFamily(rawValue: defaults.string(forKey: Key.fontFamily) ?? "") ?? .sans
         fontSize = PromptFontSize(rawValue: defaults.string(forKey: Key.fontSize) ?? "") ?? .lg
-        cueColor = PromptColorPreset(rawValue: defaults.string(forKey: Key.cueColor) ?? "") ?? .white
+        let cueColors = Array((defaults.stringArray(forKey: "cueColorPaletteHex") ?? Self.defaultEditorPalette).compactMap(TextColorRun.canonicalHex).prefix(Self.maximumPaletteColors))
+        var restoredCues = cueColors.isEmpty ? ["#ffffff"] : cueColors
+        let legacyCue = PromptColorPreset(rawValue: defaults.string(forKey: Key.cueColor) ?? "") ?? .white
+        let selectedCue = defaults.string(forKey: "ios.cueColorHex").flatMap(TextColorRun.canonicalHex) ?? legacyCue.uiColor.rgbHex
+        let savedCueIndex = defaults.object(forKey: "selectedCuePaletteIndex") as? Int
+        let cueIndex: Int
+        if let savedCueIndex, restoredCues.indices.contains(savedCueIndex) {
+            cueIndex = savedCueIndex
+        } else if let matchingIndex = restoredCues.firstIndex(of: selectedCue) {
+            cueIndex = matchingIndex
+        } else {
+            restoredCues[0] = selectedCue
+            cueIndex = 0
+        }
+        let restoredEntries = restoredCues.map { ScriptPaletteEntry(hex: $0) }
+        cuePalette = restoredEntries
+        selectedCueID = restoredEntries[cueIndex].id
+
         cueBrightness = CueBrightness(rawValue: defaults.string(forKey: Key.cueBrightness) ?? "") ?? .dim
         let savedOpacity = defaults.double(forKey: Key.overlayOpacity)
         overlayOpacity = savedOpacity > 0 ? savedOpacity : 0.52
@@ -123,6 +158,22 @@ final class AppModel {
         editorPalette.removeAll { $0.id == id }
     }
 
+    func setCuePaletteColor(_ hex: String, id: UUID) {
+        guard let color = TextColorRun.canonicalHex(hex), let index = cuePalette.firstIndex(where: { $0.id == id }) else { return }
+        cuePalette[index].hex = color
+    }
+
+    func addCuePaletteColor() {
+        guard cuePalette.count < Self.maximumPaletteColors else { return }
+        let color = Self.defaultEditorPalette.first { color in !cuePalette.contains(where: { $0.hex == color }) } ?? "#8e8e93"
+        cuePalette.append(ScriptPaletteEntry(hex: color))
+    }
+
+    func removeCuePaletteColor(id: UUID) {
+        guard cuePalette.count > 1 else { return }
+        cuePalette.removeAll { $0.id == id }
+    }
+
     func startSession() {
         guard canStart else { return }
         isShowingSession = true
@@ -140,7 +191,7 @@ final class AppModel {
             scrollSpeed: scrollSpeed,
             fontFamily: fontFamily,
             fontSize: fontSize,
-            cueColor: cueColor,
+            cueColorHex: cueColorHex,
             cueBrightness: cueBrightness,
             overlayOpacity: overlayOpacity,
             speechLocaleIdentifier: speechLocaleIdentifier
