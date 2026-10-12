@@ -113,7 +113,7 @@ struct FormattedPage: Codable, Equatable {
     }
     #endif
 
-    /// Dictation replaces a changing segment while preserving the colors outside it.
+    /// Plain-text callers without an edit range preserve the matching prefix and suffix.
     func updatingText(_ newText: String, insertionColor: String? = nil) -> FormattedPage {
         let old = Array(text), new = Array(newText)
         var prefix = 0
@@ -123,11 +123,15 @@ struct FormattedPage: Codable, Equatable {
               old[old.count - 1 - suffix] == new[new.count - 1 - suffix] { suffix += 1 }
         let start = String(old.prefix(prefix)).utf16.count
         let length = String(old.dropFirst(prefix).dropLast(suffix)).utf16.count
-        let storage = NSMutableAttributedString(attributedString: attributedString)
-        let inherited = start > 0 ? storage.attribute(.foregroundColor, at: start - 1, effectiveRange: nil) as? FormattingColor : nil
-        let color = insertionColor.map { FormattingColor(rgbHex: $0) } ?? inherited ?? .white
         let replacement = String(new.dropFirst(prefix).dropLast(suffix))
-        storage.replaceCharacters(in: NSRange(location: start, length: length),
+        return replacingCharacters(in: NSRange(location: start, length: length), with: replacement, insertionColor: insertionColor)
+    }
+
+    func replacingCharacters(in range: NSRange, with replacement: String, insertionColor: String? = nil) -> FormattedPage {
+        let storage = NSMutableAttributedString(attributedString: attributedString)
+        let inherited = range.location > 0 ? storage.attribute(.foregroundColor, at: range.location - 1, effectiveRange: nil) as? FormattingColor : nil
+        let color = insertionColor.map { FormattingColor(rgbHex: $0) } ?? inherited ?? .white
+        storage.replaceCharacters(in: range,
                                   with: NSAttributedString(string: replacement, attributes: [.foregroundColor: color]))
         return FormattedPage(attributedString: storage)
     }

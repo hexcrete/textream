@@ -222,23 +222,26 @@ Happy presenting! [wave]
 
             let pageIndex = service.currentPageIndex
             guard pageIndex < service.pages.count else { return }
-            var text = service.pages[pageIndex]
+            let sourceText = service.pages[pageIndex]
 
             // Remove the old segment text
-            let safeStart = min(segmentStart, text.count)
-            let removeStart = text.index(text.startIndex, offsetBy: safeStart)
-            let safeLen = min(segmentLength, text.count - safeStart)
-            let removeEnd = text.index(removeStart, offsetBy: safeLen)
-            text.removeSubrange(removeStart..<removeEnd)
+            let safeStart = min(segmentStart, sourceText.count)
+            let removeStart = sourceText.index(sourceText.startIndex, offsetBy: safeStart)
+            let safeLen = min(segmentLength, sourceText.count - safeStart)
+            let removeEnd = sourceText.index(removeStart, offsetBy: safeLen)
+            let replacementRange = NSRange(removeStart..<removeEnd, in: sourceText)
 
             // Build the new segment content
             let sep = segmentNeedsSeparator ? " " : ""
             let newSegment = sep + effectiveText
-            text.insert(contentsOf: newSegment, at: text.index(text.startIndex, offsetBy: min(segmentStart, text.count)))
+            let page = service.formattedPages[pageIndex].replacingCharacters(
+                in: replacementRange, with: newSegment, insertionColor: formatting.selectedColor
+            )
+            let text = page.text
 
             let prevLen = segmentLength
             segmentLength = newSegment.count
-            service.updatePageText(text, at: pageIndex, insertionColor: formatting.selectedColor)
+            service.updatePage(page, at: pageIndex)
 
             // Highlight only the newly added characters
             let newChars = segmentLength - prevLen
