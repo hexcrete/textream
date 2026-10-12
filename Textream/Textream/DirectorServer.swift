@@ -35,7 +35,7 @@ class DirectorServer {
 
     // Callbacks
     var onSetText: ((FormattedPage) -> Void)?
-    var onUpdateText: ((FormattedPage, Int) -> Void)?
+    var onUpdateText: ((FormattedPage, Int, Bool) -> Void)?
     var onStop: (() -> Void)?
 
     var httpPort: UInt16 { NotchSettings.shared.directorServerPort }
@@ -213,7 +213,7 @@ class DirectorServer {
                 }
             case "updateText":
                 if let page = command.formattedPage, let readCharCount = command.readCharCount {
-                    self.onUpdateText?(page, readCharCount)
+                    self.onUpdateText?(page, readCharCount, command.formattedRuns != nil)
                 }
             case "stop":
                 self.onStop?()

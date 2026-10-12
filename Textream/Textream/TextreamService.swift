@@ -406,8 +406,8 @@ class TextreamService: NSObject, ObservableObject {
         directorServer.onSetText = { [weak self] text in
             self?.setTextFromDirector(text)
         }
-        directorServer.onUpdateText = { [weak self] text, readCharCount in
-            self?.updateTextFromDirector(text, readCharCount: readCharCount)
+        directorServer.onUpdateText = { [weak self] text, readCharCount, hasFormatting in
+            self?.updateTextFromDirector(text, readCharCount: readCharCount, hasFormatting: hasFormatting)
         }
         directorServer.onStop = { [weak self] in
             self?.stopDirectorReading()
@@ -469,9 +469,9 @@ class TextreamService: NSObject, ObservableObject {
         }
     }
 
-    func updateTextFromDirector(_ page: FormattedPage, readCharCount: Int) {
+    func updateTextFromDirector(_ incomingPage: FormattedPage, readCharCount: Int, hasFormatting: Bool) {
         guard directorIsReading else { return }
-        let trimmed = page.text
+        let trimmed = incomingPage.text
         guard !trimmed.isEmpty else { return }
 
         let oldPage = formattedPages[0]
@@ -479,7 +479,19 @@ class TextreamService: NSObject, ObservableObject {
             forSpeechOffset: min(overlayController.speechRecognizer.recognizedCharCount, max(0, readCharCount)),
             words: splitTextIntoWords(oldPage.text)
         )
-        guard oldPage.prefix(utf16Count: protectedOffset) == page.prefix(utf16Count: protectedOffset) else { return }
+        let oldPrefix = oldPage.prefix(utf16Count: protectedOffset)
+        guard incomingPage.text.utf16.count >= protectedOffset,
+              oldPrefix.text == incomingPage.prefix(utf16Count: protectedOffset).text else { return }
+        let page: FormattedPage
+        if hasFormatting {
+            guard oldPrefix == incomingPage.prefix(utf16Count: protectedOffset) else { return }
+            page = incomingPage
+        } else {
+            // Legacy clients have no color metadata; keep the locked prefix intact.
+            let unreadRange = NSRange(location: protectedOffset, length: incomingPage.text.utf16.count - protectedOffset)
+            let unread = FormattedPage(attributedString: incomingPage.attributedString.attributedSubstring(from: unreadRange))
+            page = FormattedPage(runs: oldPrefix.runs + unread.runs)
+        }
         formattedPages = [page]
 
         let words = splitTextIntoWords(trimmed)
