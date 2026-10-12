@@ -99,12 +99,21 @@ function selectionOffsets() {
   const range = editorRange();
   if (!range) return null;
   function offset(node, index) {
-    const prefix = document.createRange();
-    prefix.selectNodeContents(editor);
-    prefix.setEnd(node, index);
-    // The sentinel keeps the last whitespace when normalizing the prefix.
-    const runs = extractRuns(prefix.cloneContents());
-    return plain(normalizeDirectorRuns([...lockedRuns, ...runs, {text: 'x', color: '#ffffff'}])).length - 1 - plain(lockedRuns).length;
+    const path = [];
+    for (let current = node; current !== editor; current = current.parentNode) {
+      path.unshift(Array.prototype.indexOf.call(current.parentNode.childNodes, current));
+    }
+    const clone = editor.cloneNode(true);
+    const endpoint = path.reduce((parent, childIndex) => parent.childNodes[childIndex], clone);
+    let marker = '\u0001';
+    while ((plain(lockedRuns) + editor.textContent).includes(marker)) marker += '\u0001';
+    const caret = document.createRange();
+    caret.setStart(endpoint, index);
+    caret.collapse(true);
+    caret.insertNode(document.createTextNode(marker));
+    // Put the marker inside the partial paragraph, before its synthetic closing newline.
+    const text = plain(normalizeDirectorRuns([...lockedRuns, ...extractRuns(clone)]));
+    return text.indexOf(marker) - plain(lockedRuns).length;
   }
   return [offset(range.startContainer, range.startOffset), offset(range.endContainer, range.endOffset)];
 }
